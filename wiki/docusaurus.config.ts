@@ -10,6 +10,11 @@ const config: Config = {
     v4: true,
   },
 
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
+
   url: 'https://syncdrivenet.github.io',
   baseUrl: '/docs/',
 
