@@ -42,9 +42,9 @@ graph LR
     PiCtlr -->|MQTT cmd| PiCam2
     PiCtlr -->|MQTT cmd| PiCam3
 
-    PiCam1 -->|rsync video| PiCtlr
-    PiCam2 -->|rsync video| PiCtlr
-    PiCam3 -->|rsync video| PiCtlr
+    PiCam1 ==>|rsync continuous| PiCtlr
+    PiCam2 ==>|rsync continuous| PiCtlr
+    PiCam3 ==>|rsync continuous| PiCtlr
 
     PiCam1 -.->|MQTT status| MQTT
     PiCam2 -.->|MQTT status| MQTT
@@ -87,7 +87,20 @@ Retained topics `session/state` and `session/last` allow devices to rejoin an ac
 
 | Device | Format | Notes |
 |--------|--------|-------|
-| `picam-*` | MP4 H.264, 30-60s snippets | rsync to pi-ctlr, delete on success |
+| `picam-*` | MP4 H.264, 30-60s snippets | Continuous rsync to pi-ctlr |
 | `phone` / `watch` | SQLite | `timestamp, recording_id, sensor_type, value` |
 | `sensor` | SQLite or CSV | Same schema |
 | `pi-ctlr` | Folder per `recording_id` | Aggregates all video + sensor DBs |
+
+### Rsync (Continuous)
+
+Rsync runs continuously in the background on each picam node, independent of recording state. This ensures video snippets are transferred to pi-ctlr as soon as they're written, freeing up SD card space.
+
+```bash
+# Runs on each picam node (cron or systemd timer)
+rsync -av --remove-source-files /home/pi/videos/ pi-ctlr:/mnt/videos/picam-01/
+```
+
+- **Not session-triggered** — always running
+- **Deletes source on success** — keeps picam storage free
+- **Fault tolerant** — resumes on reconnect
