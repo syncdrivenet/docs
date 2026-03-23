@@ -18,6 +18,42 @@ graph TD
     Router --- Watch[Apple Watch]
 ```
 
+### Data Flow
+
+```mermaid
+graph LR
+    subgraph Cameras
+        PiCam1[picam-01]
+        PiCam2[picam-02]
+        PiCam3[picam-03]
+    end
+
+    subgraph Controller
+        PiCtlr[pi-ctlr]
+        MQTT[Mosquitto]
+    end
+
+    subgraph Mobile
+        Phone[iPhone]
+        Watch[Watch]
+    end
+
+    PiCtlr -->|MQTT cmd| PiCam1
+    PiCtlr -->|MQTT cmd| PiCam2
+    PiCtlr -->|MQTT cmd| PiCam3
+
+    PiCam1 -->|rsync video| PiCtlr
+    PiCam2 -->|rsync video| PiCtlr
+    PiCam3 -->|rsync video| PiCtlr
+
+    PiCam1 -.->|MQTT status| MQTT
+    PiCam2 -.->|MQTT status| MQTT
+    PiCam3 -.->|MQTT status| MQTT
+
+    Phone <-->|MQTT| MQTT
+    Watch <-->|MQTT| MQTT
+```
+
 All devices connect via WiFi to a local router. The `pi-ctlr` runs the Mosquitto MQTT broker. Remote access via **Tailscale VPN**.
 
 ## Devices
