@@ -2,8 +2,6 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
-
 const config: Config = {
   title: 'SyncDriveNet',
   tagline: 'Multi-Device Recording System Documentation',
@@ -22,9 +20,6 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
 
-  // Even if you don't use internationalization, you can use this field to set
-  // useful metadata like html lang. For example, if your site is Chinese, you
-  // may want to replace "en" with "zh-Hans".
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -36,7 +31,6 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/syncdrivenet/docs/tree/main/wiki/',
           routeBasePath: '/',
         },
         blog: false,
@@ -56,10 +50,14 @@ const config: Config = {
       title: 'SyncDriveNet',
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'docsSidebar',
-          position: 'left',
+          to: '/reference/api',
           label: 'Docs',
+          position: 'left',
+        },
+        {
+          to: '/guides/data-export',
+          label: 'Guide',
+          position: 'left',
         },
         {
           href: 'https://github.com/syncdrivenet',
