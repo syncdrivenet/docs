@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # System Design
 
 ## Overview
@@ -7,51 +11,31 @@ Multi-device recording system coordinated by a Pi controller. All devices record
 ## Network
 
 ```mermaid
-graph TD
-    Router[Router / WiFi AP]
-
-    Router --- PiCtlr[pi-ctlr]
-    Router --- PiCam1[picam-01]
-    Router --- PiCam2[picam-02]
-    Router --- PiCam3[picam-03]
-    Router --- Phone[iPhone]
-    Router --- Watch[Apple Watch]
-```
-
-### Data Flow
-
-```mermaid
 graph LR
-    subgraph Cameras
-        PiCam1[picam-01]
-        PiCam2[picam-02]
-        PiCam3[picam-03]
+    subgraph Network
+        Router[Router]
     end
 
     subgraph Controller
-        PiCtlr[pi-ctlr]
-        MQTT[Mosquitto]
+        PiCtlr[pi-ctlr<br/>MQTT broker]
+    end
+
+    subgraph Cameras
+        PiCam[picam-01..n]
     end
 
     subgraph Mobile
-        Phone[iPhone]
-        Watch[Watch]
+        Phone[iPhone / Watch]
     end
 
-    PiCtlr -->|MQTT cmd| PiCam1
-    PiCtlr -->|MQTT cmd| PiCam2
-    PiCtlr -->|MQTT cmd| PiCam3
+    Router --- PiCtlr
+    Router --- PiCam
+    Router --- Phone
 
-    PiCam1 ==>|rsync continuous| PiCtlr
-    PiCam2 ==>|rsync continuous| PiCtlr
-    PiCam3 ==>|rsync continuous| PiCtlr
-
-    PiCam1 -.->|MQTT status| MQTT
-    PiCam2 -.->|MQTT status| MQTT
-    PiCam3 -.->|MQTT status| MQTT
-
-    Phone <-->|MQTT| MQTT
-    Watch <-->|MQTT| MQTT
+    PiCtlr -->|MQTT cmd| PiCam
+    PiCam ==>|rsync| PiCtlr
+    PiCam -.->|MQTT status| PiCtlr
+    Phone <-.->|MQTT| PiCtlr
 ```
 
 All devices connect via WiFi to a local router. The `pi-ctlr` runs the Mosquitto MQTT broker. Remote access via **Tailscale VPN**.
@@ -61,9 +45,7 @@ All devices connect via WiFi to a local router. The `pi-ctlr` runs the Mosquitto
 | ID | Hardware | Role |
 |----|----------|------|
 | `pi-ctlr` | Pi 4 | Session authority, MQTT broker, data aggregation |
-| `picam-01` | Pi Zero 2 | 1080p video, 360p live stream |
-| `picam-02` | Pi Zero 2 | 1080p video, 360p live stream |
-| `picam-03` | Pi Zero 2 | 1080p video, 360p live stream |
+| `picam-01..n` | Pi Zero 2 | 1080p video, 360p live stream (scalable) |
 | `phone` | iPhone | Sensor recording, user UI |
 | `watch` | Apple Watch | Sensor recording, user UI |
 | `sensor` | Pi 4 onboard | CAN, GNSS, IMU |
