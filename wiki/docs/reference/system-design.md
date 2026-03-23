@@ -59,11 +59,21 @@ idle → preflight → recording → idle
 1. **Start** — User taps start on phone/watch
 2. **Preflight** — pi-ctlr generates UUID, all devices confirm ready
 3. **Recording** — pi-ctlr sends `session/start` with `start_time` (+5s buffer)
-4. **Stop** — All devices stop, pi-ctlr triggers rsync + upload
+4. **Stop** — All devices stop recording
 
 ### Crash Recovery
 
 Retained topics `session/state` and `session/last` allow devices to rejoin an active session on reconnect.
+
+## Background Processes
+
+These run continuously, independent of session state:
+
+| Process | Where | Description |
+|---------|-------|-------------|
+| Rsync | picam → pi-ctlr | Transfers video snippets, deletes on success |
+| MQTT heartbeat | all devices | Connection keepalive |
+| Cloud upload | pi-ctlr | Uploads completed sessions to cloud |
 
 ## Storage
 
@@ -73,16 +83,3 @@ Retained topics `session/state` and `session/last` allow devices to rejoin an ac
 | `phone` / `watch` | SQLite | `timestamp, recording_id, sensor_type, value` |
 | `sensor` | SQLite or CSV | Same schema |
 | `pi-ctlr` | Folder per `recording_id` | Aggregates all video + sensor DBs |
-
-### Rsync (Continuous)
-
-Rsync runs continuously in the background on each picam node, independent of recording state. This ensures video snippets are transferred to pi-ctlr as soon as they're written, freeing up SD card space.
-
-```bash
-# Runs on each picam node (cron or systemd timer)
-rsync -av --remove-source-files /home/pi/videos/ pi-ctlr:/mnt/videos/picam-01/
-```
-
-- **Not session-triggered** — always running
-- **Deletes source on success** — keeps picam storage free
-- **Fault tolerant** — resumes on reconnect
