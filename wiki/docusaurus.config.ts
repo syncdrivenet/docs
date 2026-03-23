@@ -50,12 +50,14 @@ const config: Config = {
       title: 'SyncDriveNet',
       items: [
         {
-          to: '/reference/api',
+          type: 'docSidebar',
+          sidebarId: 'docsSidebar',
           label: 'Docs',
           position: 'left',
         },
         {
-          to: '/guides/data-export',
+          type: 'docSidebar',
+          sidebarId: 'guideSidebar',
           label: 'Guide',
           position: 'left',
         },
