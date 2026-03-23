@@ -20,38 +20,37 @@ sidebar_position: 2
 |---------|---------|-------------|
 | site | `melb` | Deployment location |
 | device-type | `picam`, `phone`, `watch`, `sensor` | Device category |
-| device-id | `picam-01`, `phone` | Unique device identifier |
-| data-type | `cmd`, `status`, `data` | Message type |
+| device-id | `01`, `02`, ... | Device number (scalable) |
+| data-type | `cmd`, `status`, `heartbeat` | Message type |
 
 ## Session Topics
 
 | Topic | Direction | Retained | Description |
 |-------|-----------|----------|-------------|
-| `melb/session/start` | pi-ctlr → all | No | Session start with UUID + start_time |
-| `melb/session/stop` | pi-ctlr → all | No | Session stop command |
-| `melb/session/state` | pi-ctlr → all | Yes | Current state: `idle`, `preflight`, `recording` |
+| `melb/session/start` | pi-ctlr → all | No | Start with UUID + start_time |
+| `melb/session/stop` | pi-ctlr → all | No | Stop command |
+| `melb/session/state` | pi-ctlr → all | Yes | `idle`, `preflight`, `recording` |
 
 ## Device Topics
 
-### Camera Nodes (picam)
+### Camera Nodes (picam-01..n)
 
 | Topic | Direction | Description |
 |-------|-----------|-------------|
-| `melb/picam/01/cmd` | pi-ctlr → picam | Commands: `start`, `stop`, `stream` |
-| `melb/picam/01/status` | picam → pi-ctlr | Status: `ready`, `recording`, `error` |
-| `melb/picam/02/cmd` | pi-ctlr → picam | Commands |
-| `melb/picam/02/status` | picam → pi-ctlr | Status |
-| `melb/picam/03/cmd` | pi-ctlr → picam | Commands |
-| `melb/picam/03/status` | picam → pi-ctlr | Status |
+| `melb/picam/+/cmd` | pi-ctlr → picam | Commands: `start`, `stop` |
+| `melb/picam/+/status` | picam → pi-ctlr | Status: `ready`, `recording`, `error` |
+| `melb/picam/+/heartbeat` | picam → pi-ctlr | Periodic keepalive |
+
+`+` is MQTT wildcard — subscribe to all picam nodes.
 
 ### Phone / Watch
 
 | Topic | Direction | Description |
 |-------|-----------|-------------|
 | `melb/phone/status` | phone → pi-ctlr | Connection status |
-| `melb/phone/sensor` | phone → pi-ctlr | Sensor data stream |
+| `melb/phone/heartbeat` | phone → pi-ctlr | Periodic keepalive |
 | `melb/watch/status` | watch → pi-ctlr | Connection status |
-| `melb/watch/sensor` | watch → pi-ctlr | Sensor data stream |
+| `melb/watch/heartbeat` | watch → pi-ctlr | Periodic keepalive |
 
 ### Onboard Sensors (pi-ctlr)
 
@@ -67,7 +66,7 @@ sidebar_position: 2
 |--------------|-----|-----------|
 | Commands | 1 | Must be delivered |
 | Status | 1 | Important for state sync |
-| Sensor data | 0 | High volume, loss acceptable |
+| Heartbeat | 0 | Frequent, loss acceptable |
 
 ## Message Payloads
 
@@ -79,7 +78,7 @@ sidebar_position: 2
 }
 ```
 
-### picam/status
+### picam status
 ```json
 {
   "state": "recording",
@@ -88,11 +87,10 @@ sidebar_position: 2
 }
 ```
 
-### phone/sensor
+### heartbeat
 ```json
 {
-  "ts": 1679900123456,
-  "accel": [0.01, -0.02, 9.81],
-  "gyro": [0.001, 0.002, -0.001]
+  "ts": 1679900123,
+  "uptime": 3600
 }
 ```
