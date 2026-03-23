@@ -7,7 +7,6 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'SyncDriveNet',
   tagline: 'Multi-Device Recording System Documentation',
-  favicon: 'img/favicon.ico',
 
   future: {
     v4: true,
@@ -55,10 +54,6 @@ const config: Config = {
     },
     navbar: {
       title: 'SyncDriveNet',
-      logo: {
-        alt: 'SyncDriveNet Logo',
-        src: 'img/logo.svg',
-      },
       items: [
         {
           type: 'docSidebar',
@@ -72,10 +67,6 @@ const config: Config = {
           position: 'right',
         },
       ],
-    },
-    footer: {
-      style: 'dark',
-      copyright: `© ${new Date().getFullYear()} SyncDriveNet`,
     },
     prism: {
       theme: prismThemes.github,
