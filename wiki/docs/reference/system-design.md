@@ -119,7 +119,7 @@ These run continuously, independent of session state:
 |---------|-------|-------------|
 | Rsync | cam → pi-ctlr | Transfers video files |
 | Status publish | all nodes | Health + telemetry |
-| Cloud upload | pi-ctlr | Uploads completed sessions |
+| Cloud upload | pi-ctlr | Uploads metadata + logs (not video) |
 
 ## File Naming
 
