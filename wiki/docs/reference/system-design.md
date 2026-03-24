@@ -17,11 +17,11 @@ graph LR
     end
 
     subgraph Controller
-        PiCtlr[pi-ctlr<br/>MQTT broker]
+        PiCtlr[pi-ctlr<br/>MQTT + REST]
     end
 
     subgraph Cameras
-        PiCam[picam-01..n]
+        PiCam[cam-01..n]
     end
 
     subgraph Mobile
@@ -35,35 +35,81 @@ graph LR
     PiCtlr -->|MQTT cmd| PiCam
     PiCam ==>|rsync| PiCtlr
     PiCam -.->|MQTT status| PiCtlr
-    Phone <-.->|MQTT| PiCtlr
+    Phone <-.->|REST + MQTT| PiCtlr
 ```
 
-All devices connect via WiFi to a local router. The `pi-ctlr` runs the Mosquitto MQTT broker. Remote access via **Tailscale VPN**.
+All devices connect via WiFi. The `pi-ctlr` runs Mosquitto MQTT broker and FastAPI REST server. Remote access via **Tailscale VPN**.
 
 ## Devices
 
 | ID | Hardware | Role |
 |----|----------|------|
-| `pi-ctlr` | Pi 4 | Session authority, MQTT broker, data aggregation |
-| `picam-01..n` | Pi Zero 2 | 1080p video, 360p live stream (scalable) |
-| `phone` | iPhone | Sensor recording, user UI |
-| `watch` | Apple Watch | Sensor recording, user UI |
-| `sensor` | Pi 4 onboard | CAN, GNSS, IMU |
+| `pi-ctlr` | Pi 4 | Session authority, MQTT broker, REST API |
+| `cam-01..n` | Pi Zero 2 | Video recording (scalable) |
+| `phone` | iPhone | User UI, session control |
 
-## Session Lifecycle
+---
 
+## State Machines
+
+### Controller
+
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> preflight: POST /preflight
+    preflight --> recording: countdown=0 & all confirmed
+    preflight --> idle: timeout / cancel
+    recording --> finishing: POST /stop
+    finishing --> idle: cleanup done
 ```
-idle → preflight → recording → idle
+
+| State | Description |
+|-------|-------------|
+| `idle` | No active session. Ready to start preflight. |
+| `preflight` | Waiting for node confirmations and countdown. |
+| `recording` | Active recording session. |
+| `finishing` | Cleaning up, flushing buffers, closing files. |
+
+### Camera Node
+
+```mermaid
+stateDiagram-v2
+    [*] --> init
+    init --> ready: connected
+    ready --> preflight: prepare cmd
+    preflight --> recording: start cmd
+    preflight --> ready: abort cmd / error
+    recording --> finishing: stop cmd
+    finishing --> ready: file saved
+    recording --> ready: error
 ```
 
-1. **Start** — User taps start on phone/watch
-2. **Preflight** — pi-ctlr generates UUID, all devices confirm ready
-3. **Recording** — pi-ctlr sends `session/start` with `start_time` (+5s buffer)
-4. **Stop** — All devices stop recording
+| State | Description |
+|-------|-------------|
+| `init` | Hardware initialization, MQTT connection |
+| `ready` | Idle, publishing health, awaiting commands |
+| `preflight` | Running checks, confirming readiness |
+| `recording` | Capturing video, publishing status |
+| `finishing` | Finalizing file, flushing buffers |
 
-### Crash Recovery
+---
 
-Retained topics `session/state` and `session/last` allow devices to rejoin an active session on reconnect.
+## Session Flow
+
+1. **User starts session** → `POST /preflight` with node list
+2. **Controller** → publishes `prepare` command, starts countdown
+3. **Each node** → runs preflight checks, publishes `ready`
+4. **Countdown = 0** → controller publishes `start`
+5. **All nodes record** → publish status periodically
+6. **User stops** → `POST /stop`, controller publishes `stop`
+7. **Nodes finish** → finalize files, return to ready
+
+## Error Handling
+
+- **Node failure**: Isolated — does not affect other nodes
+- **Fatal error**: Stop recording → finalize file → publish error → return to ready
+- **Controller tracks**: Which nodes are healthy vs failed per session
 
 ## Background Processes
 
@@ -71,15 +117,14 @@ These run continuously, independent of session state:
 
 | Process | Where | Description |
 |---------|-------|-------------|
-| Rsync | picam → pi-ctlr | Transfers video snippets, deletes on success |
-| MQTT heartbeat | all devices | Connection keepalive |
-| Cloud upload | pi-ctlr | Uploads completed sessions to cloud |
+| Rsync | cam → pi-ctlr | Transfers video files |
+| Status publish | all nodes | Health + telemetry |
+| Cloud upload | pi-ctlr | Uploads completed sessions |
 
-## Storage
+## File Naming
 
-| Device | Format | Notes |
-|--------|--------|-------|
-| `picam-*` | MP4 H.264, 30-60s snippets | Continuous rsync to pi-ctlr |
-| `phone` / `watch` | SQLite | `timestamp, recording_id, sensor_type, value` |
-| `sensor` | SQLite or CSV | Same schema |
-| `pi-ctlr` | Folder per `recording_id` | Aggregates all video + sensor DBs |
+```
+{session_uuid}_{node_id}.mp4
+```
+
+Example: `db654093-03fc-42cf-bcd4-f072232fac96_cam-01.mp4`

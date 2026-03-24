@@ -4,124 +4,174 @@ sidebar_position: 2
 
 # API Reference
 
-## MQTT Broker
+## REST API (pi-ctlr)
 
-- **Host:** `pi-ctlr`
-- **Port:** 1883 (default) or 8883 (TLS)
-- **Network:** Local WiFi + Tailscale VPN
+Base URL: `http://pi-ctlr:8000`
 
-## Topic Structure
+### GET /state
 
+Returns current state with telemetry and countdown.
+
+```json
+{
+  "state": "preflight",
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "countdown": 8,
+  "expected_nodes": ["cam-01", "cam-02"],
+  "confirmed_nodes": ["cam-01"],
+  "all_confirmed": false,
+  "cpu": 12.5,
+  "memory": 45.2,
+  "storage": 67.8
+}
 ```
-<site>/<device-type>/<device-id>/<data-type>
+
+### POST /preflight
+
+Start preflight with scheduled recording.
+
+```json
+{
+  "start_in": 10,
+  "nodes": ["cam-01", "cam-02"]
+}
 ```
 
-| Segment | Example | Description |
-|---------|---------|-------------|
-| site | `melb-01` | Deployment location |
-| device-type | `ctlr`, `picam` | Device category |
-| device-id | `01`, `02`, ... | Device number |
-| data-type | `cmd`, `status` | Message type |
+### POST /cancel
 
-## Controller Topics
+Cancel preflight and return to idle. Only valid during `preflight` state.
 
-| Topic | Direction | Retained | Description |
-|-------|-----------|----------|-------------|
-| `melb-01/ctlr/status` | pi-ctlr → all | Yes | Controller status |
-| `melb-01/session/start` | pi-ctlr → all | No | Start with UUID + start_time |
-| `melb-01/session/stop` | pi-ctlr → all | No | Stop command |
+### POST /stop
 
-## Camera Node Topics
+Stop recording and transition to finishing. Only valid during `recording` state.
 
-| Topic | Direction | Retained | Description |
-|-------|-----------|----------|-------------|
-| `melb-01/picam/+/cmd` | pi-ctlr → picam | No | Commands: `start`, `stop` |
-| `melb-01/picam/+/status` | picam → pi-ctlr | Yes | Node status |
+### GET /health
 
-`+` is MQTT wildcard — subscribe to all picam nodes.
-
-## QoS Levels
-
-| Message Type | QoS |
-|--------------|-----|
-| Commands | 1 |
-| Status | 1 |
+```json
+{
+  "status": "ok",
+  "mqtt_connected": true
+}
+```
 
 ---
 
-## Message Payloads
+## MQTT
 
-### ctlr/status
+### Broker
 
+- **Host:** `pi-ctlr`
+- **Port:** 1883
+
+### Controller Topics
+
+#### Published by Controller
+
+| Topic | Description |
+|-------|-------------|
+| `ctlr/status` | Current state (on every state change) |
+| `ctlr/command` | Commands to nodes |
+
+#### Subscribed by Controller
+
+| Topic | Description |
+|-------|-------------|
+| `ctlr/node/+/ready` | Node ready confirmations |
+| `ctlr/node/+/status` | Node status updates |
+
+### Command Payloads
+
+#### prepare
 ```json
 {
-  "state": "recording",
-  "session_uuid": "550e8400-e29b-41d4-a716-446655440000",
-  "devices_online": 3,
-  "storage_free_mb": 128000,
-  "cpu_pct": 23,
-  "temp_c": 48,
-  "uptime_s": 86400
+  "action": "prepare",
+  "uuid": "550e8400-...",
+  "start_at": "2026-03-23T18:10:00",
+  "nodes": ["cam-01", "cam-02"]
 }
 ```
 
-| Field | Type | Description |
+#### start
+```json
+{
+  "action": "start",
+  "uuid": "550e8400-..."
+}
+```
+
+#### stop
+```json
+{
+  "action": "stop",
+  "uuid": "550e8400-..."
+}
+```
+
+#### abort
+```json
+{
+  "action": "abort",
+  "uuid": "550e8400-...",
+  "reason": "User cancelled"
+}
+```
+
+---
+
+## Camera Node Topics
+
+#### Published by Node
+
+| Topic | When | Description |
 |-------|------|-------------|
-| state | string | `idle`, `preflight`, `recording` |
-| session_uuid | string | Current session UUID (null if idle) |
-| devices_online | int | Connected picam count |
-| storage_free_mb | int | Free space for recordings |
-| cpu_pct | int | CPU usage % |
-| temp_c | int | Temperature |
-| uptime_s | int | Seconds since boot |
+| `ctlr/node/{id}/ready` | Preflight | Ready confirmation |
+| `ctlr/node/{id}/status` | Periodic | Health + recording metrics |
 
-### picam/status
+#### Node Ready Payload
 
 ```json
 {
+  "node_id": "cam-01",
+  "ready": true
+}
+```
+
+Or on error:
+```json
+{
+  "node_id": "cam-01",
+  "ready": false,
+  "error": "Hardware check failed"
+}
+```
+
+#### Node Status Payload
+
+```json
+{
+  "node_id": "cam-01",
+  "node_name": "Front Camera",
   "state": "recording",
-  "storage_free_mb": 12400,
-  "cpu_pct": 45,
-  "temp_c": 52,
-  "rsync_status": "idle",
-  "rsync_pending_mb": 0,
-  "recording_file": "2024-01-15_14-30-00.mp4",
-  "camera_ok": true,
-  "uptime_s": 3600
+  "health": "ok",
+  "session_uuid": "db654093-...",
+  "recording": {
+    "duration_secs": 125,
+    "file_size_mb": 487.2,
+    "fps_actual": 29.8,
+    "frames_dropped": 12
+  },
+  "system": {
+    "disk_free_mb": 28450,
+    "cpu_percent": 45.2
+  },
+  "timestamp": "2026-03-23T18:30:00Z"
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| state | string | `idle`, `preflight`, `recording`, `error` |
-| storage_free_mb | int | SD card free space |
-| cpu_pct | int | CPU usage % |
-| temp_c | int | Temperature (Pi Zero runs hot) |
-| rsync_status | string | `idle`, `syncing`, `error` |
-| rsync_pending_mb | int | Data waiting to sync |
-| recording_file | string | Current file (null if idle) |
-| camera_ok | bool | Camera hardware healthy |
-| uptime_s | int | Seconds since boot |
+#### Health Values
 
-### session/start
-
-```json
-{
-  "uuid": "550e8400-e29b-41d4-a716-446655440000",
-  "start_time": 1679900000
-}
-```
-
-### picam/cmd
-
-```json
-{
-  "cmd": "start",
-  "uuid": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-| Command | Description |
-|---------|-------------|
-| `start` | Begin recording with UUID |
-| `stop` | Stop recording |
+| Value | Meaning |
+|-------|---------|
+| `ok` | All systems nominal |
+| `warning` | Degraded (high CPU, frames dropping) |
+| `error` | Fatal issue, recording stopped |
